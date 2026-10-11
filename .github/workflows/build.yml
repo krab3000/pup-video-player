@@ -183,9 +183,13 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Dependency order: the player depends on the wasm package.
+          # Prereleases (1.2.3-rc.1) go to the `next` dist-tag so they never become `latest`.
+          tag=latest
+          case "$VERSION" in *-*) tag=next ;; esac
+          # Dependency order: the player depends on the wasm package. The ./ prefix makes npm treat
+          # the argument as a file; out/name.tgz would be read as a GitHub owner/repo shorthand.
           for name in pup-wasm pup-player pup-player-bundle; do
-            npm publish "out/krab3000-$name-$VERSION.tgz"
+            npm publish "./out/krab3000-$name-$VERSION.tgz" --tag "$tag"
           done
       - name: Create GitHub Release
         env:
