@@ -1,0 +1,17 @@
+node_modules
+dist
+packages/pup-wasm/build
+packages/pup-wasm/third_party
+test-media/*.mp4
+test-media/*.webm
+test-media/*.mkv
+test-media/*.ts
+test-media/*.ogg
+test-media/*.ogv
+test-media/*.flac
+test-media/*.mp3
+test-media/*.wav
+test-results
+playwright-report
+test-media/*.avi
+test-media/legacy/

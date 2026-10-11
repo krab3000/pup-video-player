@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pup-video demo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>pup-video</h1>
+      <span id="env"></span>
+    </header>
+    <form id="source">
+      <label>Fixture <select id="fixture"></select></label>
+      <label>URL <input id="url" type="url" placeholder="https://…/movie.mkv" /></label>
+      <label>File <input id="file" type="file" accept="video/*,audio/*,.mkv,.ts,.avi,.flv" /></label>
+      <label><input id="native" type="checkbox" checked /> Compare with native &lt;video&gt;</label>
+    </form>
+    <main>
+      <section>
+        <h2>&lt;pup-video&gt;</h2>
+        <pup-video id="pup" controls preload="auto"></pup-video>
+        <pre id="stats"></pre>
+      </section>
+      <section id="native-pane">
+        <h2>native &lt;video&gt;</h2>
+        <video id="ref" controls preload="auto" muted></video>
+        <pre id="ref-stats"></pre>
+      </section>
+    </main>
+    <section>
+      <h2>Events <button id="clear" type="button">clear</button></h2>
+      <ol id="log"></ol>
+    </section>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

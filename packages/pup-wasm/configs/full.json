@@ -1,0 +1,47 @@
+{
+  "configure": ["--enable-zlib"],
+  "emflags": ["-sUSE_ZLIB=1"],
+  "demuxers": [
+    "mov", "matroska", "ogg", "avi", "asf", "asf_o", "xwma", "wtv", "flv", "live_flv", "swf", "rm", "nsv", "mpegps",
+    "mpegts", "mpegtsraw", "mxf", "nut", "nuv", "dv", "gxf", "ivf", "mtv", "smjpeg", "yuv4mpegpipe", "vivo", "xmv",
+    "h261", "h263", "h264", "hevc", "m4v", "mpegvideo", "vc1", "vc1t", "dirac", "cavsvideo", "mjpeg", "mpjpeg", "gif", "apng",
+    "bink", "binka", "smacker", "roq", "flic", "fourxm", "ipmovie", "wsvqa", "wsaud", "ea", "segafilm", "thp", "str", "idcin",
+    "mp3", "aac", "loas", "ac3", "eac3", "dts", "dtshd", "truehd", "mlp", "flac", "wav", "w64", "aiff", "au", "caf", "voc",
+    "ape", "wv", "tta", "tak", "shorten", "mpc", "mpc8", "oma", "amr", "amrnb", "amrwb", "qcp", "gsm", "g722", "g723_1",
+    "g729", "mmf", "iff", "dsf", "xa", "vqf", "sol", "daud", "rso", "spdif", "pcm_s16le", "pcm_s16be", "pcm_u8",
+    "pcm_alaw", "pcm_mulaw", "pcm_f32le"
+  ],
+  "decoders": [
+    "h264", "hevc", "vp8", "vp9", "vp3", "vp4", "vp5", "vp6", "vp6a", "vp6f", "vp7", "theora",
+    "mpeg1video", "mpeg2video", "mpeg4", "msmpeg4v1", "msmpeg4v2", "msmpeg4v3", "h261", "h263", "h263i", "h263p", "flv",
+    "wmv1", "wmv2", "wmv3", "wmv3image", "vc1", "vc1image", "rv10", "rv20", "rv30", "rv40", "svq1", "svq3", "cavs", "dirac",
+    "cinepak", "indeo2", "indeo3", "indeo4", "indeo5", "msvideo1", "msrle", "mss1", "mss2", "wnv1", "aasc", "cscd", "mscc",
+    "tscc", "tscc2", "zmbv", "flashsv", "flashsv2", "fraps", "qtrle", "rpza", "smc", "eightbps", "asv1", "asv2", "cljr",
+    "mjpeg", "mjpegb", "sp5x", "jpegls", "jpeg2000", "amv", "mxpeg", "dvvideo", "prores", "dnxhd", "huffyuv", "ffvhuff",
+    "ffv1", "snow", "utvideo", "lagarith", "magicyuv", "hq_hqa", "hqx", "rawvideo", "yuv4", "v210", "png", "apng", "gif",
+    "bink", "smacker", "roq", "flic", "idcin", "interplay_video", "fourxm", "vqa", "truemotion1", "truemotion2",
+    "tgq", "tgv", "tqi", "mdec", "thp", "ulti", "vmdvideo", "xan_wc3",
+    "aac", "aac_latm", "mp1", "mp1float", "mp2", "mp2float", "mp3", "mp3float", "mp3adu", "mp3adufloat", "mp3on4",
+    "mp3on4float", "opus", "vorbis", "flac", "alac", "als", "ac3", "eac3", "dca", "truehd", "mlp", "dolby_e",
+    "wmav1", "wmav2", "wmapro", "wmalossless", "wmavoice", "xma1", "xma2", "cook", "sipr", "ra_144", "ra_288", "ralf",
+    "atrac1", "atrac3", "atrac3al", "atrac3p", "atrac3pal", "atrac9", "ape", "wavpack", "tta", "tak", "shorten",
+    "mpc7", "mpc8", "speex", "amrnb", "amrwb", "gsm", "gsm_ms", "g723_1", "g729", "ilbc", "qcelp", "evrc", "qdm2",
+    "qdmc", "nellymoser", "imc", "truespeech", "metasound", "on2avc", "twinvq", "iac", "mace3", "mace6", "dsd_lsbf",
+    "dsd_msbf", "dsd_lsbf_planar", "dsd_msbf_planar", "dst", "dvaudio", "eightsvx_exp", "eightsvx_fib", "comfortnoise",
+    "smackaud", "binkaudio_dct", "binkaudio_rdft", "interplay_dpcm", "roq_dpcm", "xan_dpcm", "sol_dpcm",
+    "adpcm_ms", "adpcm_ima_wav", "adpcm_ima_qt", "adpcm_ima_dk3", "adpcm_ima_dk4", "adpcm_ima_ws", "adpcm_ima_amv",
+    "adpcm_swf", "adpcm_yamaha", "adpcm_g722", "adpcm_g726", "adpcm_g726le", "adpcm_xa", "adpcm_adx", "adpcm_ea",
+    "adpcm_ct", "adpcm_4xm", "adpcm_thp", "adpcm_thp_le",
+    "pcm_s8", "pcm_s8_planar", "pcm_u8", "pcm_s16le", "pcm_s16be", "pcm_s16le_planar", "pcm_s16be_planar", "pcm_u16le",
+    "pcm_u16be", "pcm_s24le", "pcm_s24be", "pcm_s24le_planar", "pcm_s24daud", "pcm_u24le", "pcm_u24be", "pcm_s32le",
+    "pcm_s32be", "pcm_s32le_planar", "pcm_u32le", "pcm_u32be", "pcm_s64le", "pcm_s64be", "pcm_f16le", "pcm_f24le",
+    "pcm_f32le", "pcm_f32be", "pcm_f64le", "pcm_f64be", "pcm_alaw", "pcm_mulaw", "pcm_bluray", "pcm_dvd", "pcm_lxf",
+    "s302m"
+  ],
+  "parsers": [
+    "h264", "hevc", "vp3", "vp8", "vp9", "mpegvideo", "mpeg4video", "h261", "h263", "vc1", "rv34", "cavsvideo", "dirac",
+    "dnxhd", "mjpeg", "png", "gif", "aac", "aac_latm", "mpegaudio", "opus", "vorbis", "flac", "ac3", "dca", "mlp",
+    "dolby_e", "cook", "sipr", "amr", "gsm", "g723_1", "g729", "tak", "adx", "dvaudio", "xma"
+  ],
+  "bsfs": ["extract_extradata", "h264_mp4toannexb", "hevc_mp4toannexb", "vp9_superframe_split", "mpeg4_unpack_bframes"]
+}

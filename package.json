@@ -1,0 +1,18 @@
+{
+  "name": "pup-video-player",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build:wasm": "pnpm --filter @pup/wasm build",
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter demo dev",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.0",
+    "typescript": "^5.9.2",
+    "@types/node": "^24.0.0"
+  }
+}

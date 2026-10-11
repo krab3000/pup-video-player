@@ -1,0 +1,29 @@
+{
+  "name": "@pup/wasm",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "FFmpeg (Emscripten) demux/decode core for pup-video-player",
+  "license": "LGPL-2.1-or-later",
+  "exports": {
+    ".": "./src/ts/index.ts",
+    "./configs/*": "./configs/*",
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "src/ts",
+    "dist",
+    "configs"
+  ],
+  "scripts": {
+    "setup": "./scripts/setup-emsdk.sh && ./scripts/fetch-ffmpeg.sh",
+    "build": "./scripts/build.sh all",
+    "build:full-st": "./scripts/build.sh full st",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "@types/node": "^24.0.0",
+    "vitest": "^3.2.4"
+  }
+}

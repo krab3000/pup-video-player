@@ -1,0 +1,40 @@
+import { css, html, nothing } from 'lit';
+import { customElement } from 'lit/decorators.js';
+import type { Renderer } from '../engine/renderer';
+import './pup-controls';
+import { PupMediaElement } from './pup-media-element';
+
+/** <pup-audio>: drop-in replacement for <audio>. Hidden unless `controls` is set. */
+@customElement('pup-audio')
+export class PupAudioElement extends PupMediaElement {
+  static styles = css`
+    :host {
+      display: none;
+    }
+    :host([controls]) {
+      display: inline-block;
+      width: 300px;
+      height: 54px;
+      position: relative;
+      vertical-align: baseline;
+    }
+    pup-controls {
+      position: absolute;
+      inset: 0;
+    }
+  `;
+
+  protected get renderer(): Renderer | null {
+    return null;
+  }
+
+  render() {
+    return this.controls ? html`<pup-controls part="controls" .media=${this}></pup-controls>` : nothing;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'pup-audio': PupAudioElement;
+  }
+}

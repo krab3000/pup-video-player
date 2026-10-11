@@ -1,0 +1,6 @@
+{
+  "demuxers": ["mov", "matroska", "ogg", "mp3", "flac", "wav"],
+  "decoders": ["aac", "mp3", "mp3float", "opus", "vorbis", "flac", "pcm_s16le", "pcm_s24le", "pcm_f32le"],
+  "parsers": ["h264", "hevc", "vp8", "vp9", "aac", "mpegaudio", "opus", "vorbis", "flac"],
+  "bsfs": ["extract_extradata", "vp9_superframe_split"]
+}
