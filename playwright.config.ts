@@ -16,7 +16,8 @@ export default defineConfig({
       reuseExistingServer: true,
     },
     {
-      // Serves the built standalone bundle untouched, for e2e/bundle.spec.ts.
+      // Serves the built standalone bundle untouched (e2e/bundle.spec.ts) and the generated HLS
+      // playlists of e2e/hls.spec.ts.
       command: 'node e2e/static-server.mjs 5198',
       url: 'http://localhost:5198/',
       reuseExistingServer: true,

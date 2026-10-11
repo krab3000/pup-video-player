@@ -2,9 +2,24 @@
 // the audio worklet. Every message that refers to a playback position carries
 // an `epoch`; a load or seek bumps it and receivers drop older messages.
 
-import type { CodecSet, Packet, StreamInfo } from '@krab3000/pup-wasm';
+import type { CodecSet, HlsPlaylistKind, Packet, StreamInfo } from '@krab3000/pup-wasm';
 
-export type Source = { kind: 'url'; url: string; withCredentials: boolean } | { kind: 'blob'; blob: Blob };
+/** HLS variant caps (the `hls-max-height` / `hls-max-bandwidth` attributes). */
+export interface HlsOptions {
+  maxHeight?: number;
+  maxBandwidth?: number;
+}
+
+export type Source =
+  | {
+      kind: 'url';
+      url: string;
+      withCredentials: boolean;
+      /** MIME type from a <source type>, used to detect HLS. */
+      type?: string;
+      hls?: HlsOptions;
+    }
+  | { kind: 'blob'; blob: Blob };
 
 export interface MediaInfo {
   format: string;
@@ -14,6 +29,17 @@ export interface MediaInfo {
   /** Index of the chosen video/audio stream, -1 if none. */
   video: number;
   audio: number;
+  /** Where playback starts, in seconds (HLS live: near the live edge). Default 0. */
+  startTime?: number;
+}
+
+/** getStats().hls: the HLS session behind the element, if any. */
+export interface HlsStats {
+  kind: HlsPlaylistKind;
+  /** The variant picked from a master playlist; null for a media playlist. */
+  variant: { bandwidth: number; resolution: string | null; codecs: string | null } | null;
+  segmentsLoaded: number;
+  reloads: number;
 }
 
 export type AudioMode = 'play' | 'discard';
@@ -28,7 +54,12 @@ export type ToDemux =
 export type FromDemux =
   | { type: 'opened'; epoch: number; info: MediaInfo }
   | { type: 'progress'; epoch: number; size: number; loaded: number; ranges: Array<[number, number]> }
-  | { type: 'error'; epoch: number; code: MediaErrorCode; message: string };
+  | { type: 'error'; epoch: number; code: MediaErrorCode; message: string }
+  /** HLS: the playlist's duration (Infinity while it can grow) and seekable window, on open and when they change. */
+  | { type: 'timeline'; epoch: number; duration: number; seekableStart: number; seekableEnd: number }
+  | { type: 'hls'; epoch: number; stats: HlsStats }
+  /** HLS live: playback fell out of the window; main seeks to `time` (the window start). */
+  | { type: 'behind'; epoch: number; time: number };
 
 // decode -> demux (over the direct MessageChannel)
 export type DecodeToDemux =

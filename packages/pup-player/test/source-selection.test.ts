@@ -17,7 +17,7 @@ describe('selectSource', () => {
 
   it('skips types canPlayType rejects, and sources without src', () => {
     const list: SourceCandidate[] = [
-      { src: 'a.m3u8', type: 'application/x-mpegURL' },
+      { src: 'a.mpd', type: 'application/dash+xml' },
       { src: null, type: 'video/mp4' },
       { src: '', type: null },
       { src: 'b.mkv', type: 'video/x-unknown' },

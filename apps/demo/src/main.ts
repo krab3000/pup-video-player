@@ -62,6 +62,15 @@ const LEGACY = [
   'legacy/zmbv-pcm.avi',
 ];
 
+// test-media/generate-hls.sh
+const HLS = [
+  'hls/vod-ts/index.m3u8',
+  'hls/vod-fmp4/index.m3u8',
+  'hls/byterange/index.m3u8',
+  'hls/aes/index.m3u8',
+  'hls/master/master.m3u8',
+];
+
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const pup = $<PupVideoElement>('pup');
 const ref = $<HTMLVideoElement>('ref');
@@ -76,7 +85,7 @@ $('env').textContent = `crossOriginIsolated=${crossOriginIsolated} · ${navigato
 }`;
 
 const options = (list: string[]) => list.map((f) => `<option>${f}</option>`).join('');
-fixture.innerHTML = `<optgroup label="Modern">${options(FIXTURES)}</optgroup><optgroup label="Legacy / exotic">${options(LEGACY)}</optgroup>`;
+fixture.innerHTML = `<optgroup label="Modern">${options(FIXTURES)}</optgroup><optgroup label="Legacy / exotic">${options(LEGACY)}</optgroup><optgroup label="HLS">${options(HLS)}</optgroup>`;
 
 function loadUrl(url: string): void {
   pup.srcObject = null;
@@ -121,7 +130,10 @@ setInterval(() => {
     `time ${pup.currentTime.toFixed(3)} / ${pup.duration.toFixed(3)}  paused=${pup.paused} ended=${pup.ended} seeking=${pup.seeking}`,
     `readyState=${pup.readyState} networkState=${pup.networkState}  ${pup.videoWidth}x${pup.videoHeight}`,
     `format=${s.format} video=${s.videoDecoder} threading=${s.threading} decodeFps=${s.decodeFps.toFixed(1)}`,
-    `presented=${s.presentedFrames} dropped=${s.droppedFrames}  buffered=${fmt(pup.buffered)}`,
+    `presented=${s.presentedFrames} dropped=${s.droppedFrames}  buffered=${fmt(pup.buffered)}  seekable=${fmt(pup.seekable)}`,
+    ...(s.hls
+      ? [`hls ${s.hls.kind} variant=${s.hls.variant?.resolution ?? '-'} segments=${s.hls.segmentsLoaded} reloads=${s.hls.reloads}`]
+      : []),
   ].join('\n');
   $('ref-stats').textContent = ref.src
     ? `time ${ref.currentTime.toFixed(3)} / ${ref.duration.toFixed(3)}  readyState=${ref.readyState}${ref.error ? `  error ${ref.error.code}` : ''}`

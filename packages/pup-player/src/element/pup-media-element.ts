@@ -65,6 +65,10 @@ export abstract class PupMediaElement extends LitElement {
   @property({ attribute: 'codec-set' }) codecSet: CodecSet = 'full';
   /** Debug: decode video with FFmpeg even when WebCodecs could. */
   @property({ type: Boolean, attribute: 'force-software' }) forceSoftware = false;
+  /** HLS: highest variant height to pick from a master playlist. Read at load. */
+  @property({ type: Number, attribute: 'hls-max-height' }) hlsMaxHeight?: number;
+  /** HLS: highest variant BANDWIDTH (bits/s) to pick from a master playlist. Read at load. */
+  @property({ type: Number, attribute: 'hls-max-bandwidth' }) hlsMaxBandwidth?: number;
 
   private _engine: PupEngine | null = null;
   private _srcObject: Blob | MediaSource | MediaStream | null = null;
@@ -184,7 +188,7 @@ export abstract class PupMediaElement extends LitElement {
       throw new DOMException('Only Blob/File srcObject values are supported', 'NotSupportedError');
     } else if (this.src) {
       const url = new URL(this.src, document.baseURI).href;
-      source = { kind: 'url', url, withCredentials: this.crossOrigin === 'use-credentials' };
+      source = this.urlSource(url);
       this._currentSrc = url;
     } else if (this.childSources().length) {
       // Not keyed on the src attribute: Lit reflects the empty default as src="".
@@ -232,8 +236,18 @@ export abstract class PupMediaElement extends LitElement {
       }
       this._sourceElement = sources[index];
       this._currentSrc = url;
-      return { kind: 'url', url, withCredentials: this.crossOrigin === 'use-credentials' };
+      return this.urlSource(url, candidates[index].type ?? undefined);
     }
+  }
+
+  private urlSource(url: string, type?: string): Source {
+    return {
+      kind: 'url',
+      url,
+      withCredentials: this.crossOrigin === 'use-credentials',
+      type,
+      hls: { maxHeight: this.hlsMaxHeight || undefined, maxBandwidth: this.hlsMaxBandwidth || undefined },
+    };
   }
 
   private onChildrenChanged(records: MutationRecord[]): void {
@@ -479,7 +493,7 @@ export abstract class PupMediaElement extends LitElement {
   // -------------------------------------------------------------------------
   // Extras
 
-  /** Pipeline diagnostics (decoder in use, threading, fps, dropped frames). */
+  /** Pipeline diagnostics (decoder in use, threading, fps, dropped frames, HLS session). */
   getStats(): EngineStats & { format: string | null } {
     const stats = this._engine?.stats ?? {
       threading: null,
@@ -489,6 +503,7 @@ export abstract class PupMediaElement extends LitElement {
       presentedFrames: 0,
       bytesLoaded: 0,
       bytesTotal: -1,
+      hls: null,
     };
     return { ...stats, format: this._engine?.info?.format ?? null };
   }

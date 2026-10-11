@@ -12,6 +12,7 @@ import {
   type FromDecode,
   type FromDemux,
   type FromWorklet,
+  type HlsStats,
   type MediaInfo,
   type Source,
   type ToDecode,
@@ -53,6 +54,8 @@ export interface EngineStats {
   /** Bytes of the source fetched so far / total size (-1 if unknown). */
   bytesLoaded: number;
   bytesTotal: number;
+  /** The HLS session, or null when the source is not HLS. */
+  hls: HlsStats | null;
 }
 
 type Deferred = { resolve: () => void; reject: (e: unknown) => void };
@@ -88,6 +91,7 @@ export class PupEngine {
     presentedFrames: 0,
     bytesLoaded: 0,
     bytesTotal: -1,
+    hls: null,
   };
 
   private demux: Worker | null = null;
@@ -99,6 +103,10 @@ export class PupEngine {
   private audioSetup: Promise<void> | null = null;
 
   private epoch = 0;
+  /** Epoch of the current load: demux messages from older loads are ignored. */
+  private loadEpoch = 0;
+  /** HLS playlist duration and seekable window; null for plain files. */
+  private timeline: { duration: number; start: number; end: number } | null = null;
   private source: Source | null = null;
   private sourceProvider: SourceProvider | null = null;
   private opened = false;
@@ -169,7 +177,9 @@ export class PupEngine {
   }
 
   get seekable(): Array<[number, number]> {
-    if (!this.opened || !Number.isFinite(this.duration)) return [];
+    if (!this.opened) return [];
+    if (this.timeline) return this.timeline.end > this.timeline.start ? [[this.timeline.start, this.timeline.end]] : [];
+    if (!Number.isFinite(this.duration)) return [];
     return [[0, this.duration]];
   }
 
@@ -264,7 +274,12 @@ export class PupEngine {
       this.pendingSeek = Math.max(0, time);
       return;
     }
-    if (Number.isFinite(this.duration)) time = Math.min(time, this.duration);
+    if (this.timeline && !Number.isFinite(this.duration)) {
+      // A growing or live HLS playlist: stay inside the seekable window.
+      time = Math.min(Math.max(time, this.timeline.start), this.timeline.end);
+    } else if (Number.isFinite(this.duration)) {
+      time = Math.min(time, this.duration);
+    }
     time = Math.max(0, time);
     this.closePlayedRange();
     if (this.started) this.stopPlayback();
@@ -339,6 +354,7 @@ export class PupEngine {
 
   private reset(): void {
     this.epoch++;
+    this.loadEpoch = this.epoch;
     this.toDemux({ type: 'close' });
     this.toDecode({ type: 'reset' });
     this.toWorklet({ type: 'flush', epoch: this.epoch });
@@ -351,6 +367,7 @@ export class PupEngine {
     this.sourceProvider = null;
     this.opened = this.configured = false;
     this.info = null;
+    this.timeline = null;
     this.duration = NaN;
     this.paused = true;
     this.ended = this.seeking = this.waiting = this.started = false;
@@ -372,6 +389,7 @@ export class PupEngine {
     this.stats.videoDecoder = 'none';
     this.stats.bytesLoaded = 0;
     this.stats.bytesTotal = -1;
+    this.stats.hls = null;
   }
 
   private nextSource(): boolean {
@@ -393,6 +411,7 @@ export class PupEngine {
 
   private open(): void {
     this.ensureWorkers();
+    this.loadEpoch = this.epoch;
     this.toDemux({ type: 'open', epoch: this.epoch, source: this.source! });
   }
 
@@ -460,7 +479,9 @@ export class PupEngine {
   // Worker messages
 
   private onDemux(msg: FromDemux): void {
-    if (msg.epoch !== this.epoch && msg.type !== 'progress') return;
+    // Progress and HLS playlist updates belong to the load, not to one seek.
+    const loadWide = msg.type === 'progress' || msg.type === 'timeline' || msg.type === 'hls';
+    if (loadWide ? msg.epoch < this.loadEpoch : msg.epoch !== this.epoch) return;
     switch (msg.type) {
       case 'opened':
         void this.onOpened(msg.info, msg.epoch);
@@ -475,7 +496,25 @@ export class PupEngine {
       case 'error':
         this.fail(msg.code, msg.message);
         break;
+      case 'timeline':
+        this.onTimeline(msg.duration, msg.seekableStart, msg.seekableEnd);
+        break;
+      case 'hls':
+        this.stats.hls = msg.stats;
+        break;
+      case 'behind':
+        // Like Safari: playback fell out of the live window, jump to its start.
+        if (this.configured && !this.seeking) this.seek(msg.time);
+        break;
     }
+  }
+
+  private onTimeline(duration: number, start: number, end: number): void {
+    this.timeline = { duration, start, end };
+    if (!this.configured || duration === this.duration) return;
+    // EVENT playlist reached ENDLIST: the duration becomes finite.
+    this.duration = duration;
+    this.emit('durationchange');
   }
 
   private async onOpened(info: MediaInfo, epoch: number): Promise<void> {
@@ -561,12 +600,12 @@ export class PupEngine {
       this.hasVideo = false;
       this.videoWidth = this.videoHeight = 0;
     }
-    this.duration = this.info!.duration;
+    this.duration = this.timeline?.duration ?? this.info!.duration;
     this.readyState = HAVE_METADATA;
     this.emit('durationchange');
     if (this.hasVideo) this.emit('resize');
     this.emit('loadedmetadata');
-    const start = this.pendingSeek ?? 0;
+    const start = this.pendingSeek ?? this.info!.startTime ?? 0;
     this.pendingSeek = null;
     this.seek(start, true);
   }

@@ -1,25 +1,26 @@
 // Demux worker: owns one single-threaded wasm instance and reads the source
 // synchronously (sync XHR / FileReaderSync), handing packets to the decode
-// worker on request.
+// worker on request. HLS sources are read asynchronously by an HlsSession.
 
 import {
   BlobSource,
   BlockCache,
-  DemuxError,
   Demuxer,
   IORegistry,
   RangeSource,
   SourceError,
   loadCore,
+  type CodecSet,
   type Core,
-  type StreamInfo,
 } from '@krab3000/pup-wasm';
+import { canPlayType } from '../element/can-play-type.js';
+import { HlsError, HlsSession, isHlsSource, looksLikeHls } from './hls-session.js';
+import { describe } from './media-info.js';
 import {
   MediaErrorCode,
   type DecodeToDemux,
   type DemuxToDecode,
   type FromDemux,
-  type MediaInfo,
   type Source,
   type ToDemux,
 } from './protocol.js';
@@ -30,6 +31,7 @@ const BATCH_BYTES = 1 << 20;
 const PROGRESS_INTERVAL_MS = 350;
 
 let core: Core;
+let codecSet: CodecSet = 'full';
 let io: IORegistry;
 let port: MessagePort;
 let ready: Promise<void>;
@@ -42,6 +44,7 @@ let selected = new Set<number>();
 let eof = false;
 let lastProgress = 0;
 let lastFetched = 0;
+let hls: HlsSession | null = null;
 
 const post = (msg: FromDemux) => (self as unknown as Worker).postMessage(msg);
 
@@ -49,6 +52,7 @@ self.onmessage = (e: MessageEvent<ToDemux>) => {
   const msg = e.data;
   if (msg.type === 'init') {
     port = msg.decodePort;
+    codecSet = msg.set;
     port.onmessage = (ev: MessageEvent<DecodeToDemux>) => void ready.then(() => onDecode(ev.data));
     ready = loadCore({ set: msg.set, threading: 'st' }).then((c) => {
       core = c;
@@ -63,6 +67,8 @@ self.onmessage = (e: MessageEvent<ToDemux>) => {
 };
 
 function close(): void {
+  hls?.close();
+  hls = null;
   demux?.close();
   demux = null;
   if (ioId) io.unregister(ioId);
@@ -74,10 +80,18 @@ function close(): void {
 function open(newEpoch: number, source: Source): void {
   close();
   epoch = newEpoch;
+  if (source.kind === 'url' && isHlsSource(source.url, source.type)) {
+    openHls(source);
+    return;
+  }
   try {
     if (source.kind === 'url') {
       const range = new RangeSource(source.url, source.withCredentials);
       const probe = range.open(BLOCK_SIZE * 2);
+      if (looksLikeHls(probe)) {
+        openHls(source);
+        return;
+      }
       cache = new BlockCache(range, BLOCK_SIZE);
       cache.seed(probe);
     } else {
@@ -85,38 +99,48 @@ function open(newEpoch: number, source: Source): void {
     }
     ioId = io.register(cache);
     demux = Demuxer.open(core, ioId);
-    post({ type: 'opened', epoch, info: describe(demux) });
+    post({ type: 'opened', epoch, info: describe(core, demux) });
     progress(true);
   } catch (e) {
     fail(e, MediaErrorCode.SrcNotSupported);
   }
 }
 
-function playable(s: StreamInfo): boolean {
-  if (s.type === 'video') return !s.attachedPic && (s.webcodecs !== '' || core.hasDecoder(s.codecId));
-  if (s.type === 'audio') return core.hasDecoder(s.codecId);
-  return false;
+function openHls(source: Extract<Source, { kind: 'url' }>): void {
+  const session = new HlsSession(
+    {
+      core,
+      io,
+      describe: (d) => describe(core, d),
+      canPlay: (codecs) => canPlayType(`video/mp4; codecs="${codecs}"`, codecSet) !== '',
+      onTimeline: (duration, seekableStart, seekableEnd) => post({ type: 'timeline', epoch, duration, seekableStart, seekableEnd }),
+      onStats: (stats) => post({ type: 'hls', epoch, stats }),
+      onBehind: (time) => post({ type: 'behind', epoch, time }),
+      onProgress: (loaded) => hlsProgress(loaded),
+    },
+    source.url,
+    source.withCredentials ? 'include' : 'same-origin',
+    source.hls,
+  );
+  hls = session;
+  session.open().then(
+    (info) => hls === session && post({ type: 'opened', epoch, info }),
+    (e) => hls === session && failHls(session, e, MediaErrorCode.SrcNotSupported),
+  );
 }
 
-function pick(streams: StreamInfo[], type: 'video' | 'audio'): number {
-  const candidates = streams.filter((s) => s.type === type && playable(s));
-  return (candidates.find((s) => s.default) ?? candidates[0])?.index ?? -1;
+/** Reports a failed session and stops its reloads and downloads. */
+function failHls(session: HlsSession, e: unknown, fallback: MediaErrorCode): void {
+  session.close();
+  const code = e instanceof HlsError ? e.code : fallback;
+  post({ type: 'error', epoch, code, message: (e as Error).message });
 }
 
-function describe(d: Demuxer): MediaInfo {
-  const streams = d.streams();
-  const video = pick(streams, 'video');
-  const audio = pick(streams, 'audio');
-  if (video < 0 && audio < 0) {
-    const codecs = streams.map((s) => `${s.type}:${s.codec}`).join(', ');
-    throw new DemuxError(`no playable streams (${codecs || 'none'})`, 0);
-  }
-  let duration = d.duration;
-  if (!Number.isFinite(duration)) {
-    const known = streams.map((s) => s.duration).filter((x) => Number.isFinite(x));
-    duration = known.length ? Math.max(...known) : Infinity;
-  }
-  return { format: d.formatName, duration, streams, video, audio };
+function hlsProgress(loaded: number): void {
+  const now = performance.now();
+  if (now - lastProgress < PROGRESS_INTERVAL_MS) return;
+  lastProgress = now;
+  post({ type: 'progress', epoch, size: -1, loaded, ranges: [] });
 }
 
 /**
@@ -135,6 +159,10 @@ function fail(e: unknown, fallback: MediaErrorCode): void {
 }
 
 function onDecode(msg: DecodeToDemux): void {
+  if (hls) {
+    onDecodeHls(hls, msg);
+    return;
+  }
   if (!demux) return;
   if (msg.type === 'seek') {
     epoch = msg.epoch;
@@ -150,6 +178,27 @@ function onDecode(msg: DecodeToDemux): void {
   }
   if (msg.epoch !== epoch) return;
   readBatch();
+}
+
+function onDecodeHls(session: HlsSession, msg: DecodeToDemux): void {
+  if (msg.type === 'seek') {
+    epoch = msg.epoch;
+    session.seek(msg.time, msg.streams);
+    return;
+  }
+  if (msg.epoch !== epoch) return;
+  const batchEpoch = epoch;
+  session.read(BATCH_PACKETS, BATCH_BYTES).then(
+    (batch) => {
+      if (!batch || hls !== session || batchEpoch !== epoch) return;
+      const reply: DemuxToDecode = { type: 'packets', epoch, packets: batch.packets, eof: batch.eof };
+      port.postMessage(
+        reply,
+        batch.packets.map((p) => p.data.buffer as ArrayBuffer),
+      );
+    },
+    (e) => hls === session && batchEpoch === epoch && failHls(session, e, MediaErrorCode.Decode),
+  );
 }
 
 function readBatch(): void {

@@ -5,7 +5,7 @@
 - **FFmpeg compiled to WebAssembly** (our own Emscripten build plus a small C wrapper, without libav.js) to demux the container and decode audio, and to decode video the browser can't.
 - **WebCodecs `VideoDecoder`** to decode video whenever the browser supports the codec.
 
-This lets them play MKV, MPEG-TS, AVI, HEVC/AC-3, MPEG-2, FLAC and other formats with the same API and events as a native media element.
+This lets them play MKV, MPEG-TS, AVI, HEVC/AC-3, MPEG-2, FLAC, HLS and other formats with the same API and events as a native media element.
 
 ```html
 <!-- Standalone bundle (@krab3000/pup-player-bundle): no bundler, no other JS -->
@@ -77,11 +77,36 @@ main thread               demux worker (wasm st)        decode worker (wasm st|m
 - **Events:** loadstart, durationchange, loadedmetadata, loadeddata, canplay, canplaythrough, play, playing, waiting, seeking, seeked, timeupdate, pause, ended, ratechange, volumechange, resize, progress, suspend, emptied, abort, error. The e2e suite checks that the order matches native `<video>`.
 - **Styling:** `pup-video::part(video) { object-fit: cover }`, plus `::part(poster)`, `::part(captions)` and `::part(controls)`.
 - **Extras:**
-  - `getStats()` returns the decoder in use, threading, decode fps, dropped frames and bytes loaded.
+  - `getStats()` returns the decoder in use, threading, decode fps, dropped frames, bytes loaded and, for HLS, the session (`hls`, see below).
   - `destroy()` frees the workers.
   - `force-software` is a debug attribute; `?forceSoftware` in the page URL does the same.
 
-**Not implemented:** `audioTracks` and `videoTracks` (the first default stream is played), subtitle streams inside the media file (`textTracks` only covers WebVTT `<track>` children), `addTextTrack()`, MediaSource/MediaStream as `srcObject`, and HLS/DASH. Streams without timestamps, such as headerless RealAudio 1.0 `.ra`, play from the start but can't be seeked. When a container records no duration, `duration` is estimated from size and bitrate and corrected (with `durationchange`) when playback reaches the end.
+**Not implemented:** `audioTracks` and `videoTracks` (the first default stream is played), subtitle streams inside the media file (`textTracks` only covers WebVTT `<track>` children), `addTextTrack()`, MediaSource/MediaStream as `srcObject`, DASH, and the HLS features listed under [HLS](#hls). Streams without timestamps, such as headerless RealAudio 1.0 `.ra`, play from the start but can't be seeked. When a container records no duration, `duration` is estimated from size and bitrate and corrected (with `durationchange`) when playback reaches the end.
+
+## HLS
+
+`src` (or a `<source>`) can be an HLS playlist. It is recognised by a `type` of `application/vnd.apple.mpegurl` or `application/x-mpegURL`, a `.m3u8`/`.m3u` URL, or content that starts with `#EXTM3U`; `canPlayType()` answers `maybe` for those types.
+
+```html
+<pup-video src="https://example.com/stream/master.m3u8" controls hls-max-height="720"></pup-video>
+```
+
+FFmpeg's own `hls` demuxer isn't used: it needs FFmpeg's network protocols and blocks while it waits for a growing playlist. Instead the demux worker fetches playlists, keys and segments with `fetch()` (credentials follow `crossorigin`), and hands each downloaded segment to the regular FFmpeg demuxer as an in-memory file. Packet times are moved onto the playlist timeline, so playback runs straight through segment boundaries and discontinuities.
+
+| | Supported |
+| --- | --- |
+| Playlists | master (`EXT-X-STREAM-INF`) and media playlists; VOD, EVENT and live |
+| Segments | MPEG-TS (`full` set only) and fMP4 with `EXT-X-MAP`; `EXT-X-BYTERANGE` |
+| Encryption | `METHOD=AES-128` (IV attribute or derived from the media sequence number) |
+| Timeline | `EXT-X-DISCONTINUITY` (timestamps may restart), `EXT-X-DISCONTINUITY-SEQUENCE` |
+
+- **Variants:** the highest-bandwidth variant whose `CODECS` `canPlayType()` accepts and whose audio is in its own segments. Cap the choice with `hls-max-height` (pixels) and `hls-max-bandwidth` (bits per second); both are read when loading.
+- **`duration` and `seekable`:** like Safari. VOD: the playlist's duration and `[0, duration]`. EVENT: `Infinity` and `[0, end of the last segment]` while the playlist grows; when `#EXT-X-ENDLIST` arrives the duration becomes finite (`durationchange`) and playback can end. Live: `Infinity` and the playlist window. Seeks are clamped to `seekable`.
+- **Growing and live playlists** are reloaded every target duration (half of it when nothing changed) until `#EXT-X-ENDLIST`. When the next segment isn't listed or downloaded yet, playback waits (`waiting`, then `playing`). A listed segment that answers 404, 5xx or fails is retried after 0.5 s, 1 s and 2 s before `MEDIA_ERR_NETWORK`. Up to 2 segments are downloaded ahead.
+- **Live** playback starts 3 segments before the end of the playlist. If it falls out of the window (a long pause), it jumps to the window start with `seeking`/`seeked`. The built-in controls show `LIVE` and a seek bar over the window; for EVENT playlists the seek bar covers what is listed so far.
+- **`getStats().hls`:** `{ kind: 'vod' | 'event' | 'live', variant: { bandwidth, resolution, codecs } | null, segmentsLoaded, reloads }`.
+
+**Not supported:** adaptive bitrate switching (the variant is chosen once), separate audio renditions (`EXT-X-MEDIA` with a `URI`: the video plays without audio and a warning is logged), `SAMPLE-AES`, other key formats and DRM (`MEDIA_ERR_SRC_NOT_SUPPORTED`), encrypted `EXT-X-MAP` segments, a change of codec, audio format or fMP4 codec configuration across a discontinuity (`MEDIA_ERR_DECODE`), low-latency HLS, subtitle and I-frame playlists, and DASH.
 
 **Autoplay:** audio is played through an AudioContext, so unmuted autoplay follows the Web Audio autoplay policy. In real browsers this matches the media-element policy. Muted autoplay always works: audio is skipped and playback runs on the wall clock until the element is unmuted.
 
@@ -95,6 +120,7 @@ pnpm build:wasm                      # Docker: builds all four cores (full|lite 
 pnpm build                           # compiles the three packages (lib/ and the standalone bundle)
 ./test-media/generate.sh             # creates the test fixtures
 ./test-media/generate-legacy.sh      # legacy/exotic fixtures (WMV, RealMedia, FLV1, DivX 3, DV, MXF, ...)
+./test-media/generate-hls.sh         # HLS fixtures (TS, fMP4, byte ranges, AES-128, master playlist)
 pnpm dev                             # demo at http://localhost:5173
 ```
 
@@ -104,7 +130,7 @@ Tests:
 
 ```sh
 pnpm test                            # Vitest: wasm smoke tests in Node (every fixture, including all legacy ones) and player unit tests
-pnpm test:e2e                        # Playwright: Chromium + Firefox, starts the demo on :5199 and the bundle site on :5198
+pnpm test:e2e                        # Playwright: Chromium + Firefox, starts the demo on :5199 and the bundle/HLS site on :5198
 ```
 
 ## Releases

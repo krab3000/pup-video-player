@@ -35,3 +35,10 @@ test('standalone bundle: uses the multi-threaded core on a cross-origin isolated
   expect(info.isolated).toBe(true);
   expect(info.threading).toBe('mt');
 });
+
+test('standalone bundle: plays an HLS VOD playlist', async ({ page }) => {
+  const info = await playsFrom(page, 'http://localhost:5198/hls.html');
+  expect(info.threading).toBe('st');
+  const hls = await page.evaluate(() => (document.getElementById('video') as Video & { getStats(): { hls: unknown } }).getStats().hls);
+  expect(hls).toMatchObject({ kind: 'vod' });
+});

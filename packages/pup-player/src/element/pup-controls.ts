@@ -154,6 +154,19 @@ export class PupControls extends LitElement {
     .seek {
       flex: 1;
     }
+    .live {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .live::before {
+      content: '';
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin: 0 5px 1px 0;
+      border-radius: 50%;
+      background: #e53935;
+    }
     .volume {
       width: 64px;
     }
@@ -283,10 +296,21 @@ export class PupControls extends LitElement {
     this.media.playbackRate = Number((e.target as HTMLSelectElement).value);
   };
 
-  /** Track gradient: played, buffered, rest. */
-  private seekTrack(time: number, duration: number): string {
+  /**
+   * The seek bar's range: [0, duration], or the seekable window while the
+   * duration is unknown (growing or live HLS playlists).
+   */
+  private seekRange(): [number, number] | null {
     const m = this.media;
-    const pct = (t: number) => (duration > 0 ? (Math.min(t, duration) / duration) * 100 : 0);
+    if (Number.isFinite(m.duration)) return [0, m.duration];
+    const s = m.seekable;
+    return s.length && s.end(s.length - 1) > s.start(0) ? [s.start(0), s.end(s.length - 1)] : null;
+  }
+
+  /** Track gradient: played, buffered, rest. */
+  private seekTrack(time: number, [min, max]: [number, number]): string {
+    const m = this.media;
+    const pct = (t: number) => (max > min ? ((Math.min(Math.max(t, min), max) - min) / (max - min)) * 100 : 0);
     const fg = this.video ? '#fff' : '#202124';
     const buf = this.video ? 'rgb(255 255 255 / 0.5)' : 'rgb(32 33 36 / 0.4)';
     const rest = this.video ? 'rgb(255 255 255 / 0.25)' : 'rgb(32 33 36 / 0.15)';
@@ -302,7 +326,8 @@ export class PupControls extends LitElement {
     const m = this.media;
     if (!m) return nothing;
     void this.tick;
-    const duration = m.duration;
+    const range = this.seekRange();
+    const live = m.getStats().hls?.kind === 'live';
     const time = this.scrubbing ?? m.currentTime;
     const playing = !m.paused && !m.ended;
     const loading = playing && (m.readyState < m.HAVE_FUTURE_DATA || m.seeking);
@@ -316,17 +341,19 @@ export class PupControls extends LitElement {
         <button @click=${this.togglePlay} aria-label=${playing ? 'Pause' : 'Play'}>
           ${m.ended ? ICONS.replay : playing ? ICONS.pause : ICONS.play}
         </button>
-        <span class="time">${formatTime(time)} / ${formatTime(duration)}</span>
+        ${live
+          ? html`<span class="time">${formatTime(time)}</span><span class="live">LIVE</span>`
+          : html`<span class="time">${formatTime(time)} / ${formatTime(range ? range[1] : m.duration)}</span>`}
         <input
           class="seek"
           type="range"
           aria-label="Seek"
-          min="0"
-          max=${Number.isFinite(duration) ? duration : 0}
+          min=${range ? range[0] : 0}
+          max=${range ? range[1] : 0}
           step="any"
           .value=${String(time)}
-          ?disabled=${!Number.isFinite(duration)}
-          style="--track: ${this.seekTrack(time, duration)}"
+          ?disabled=${!range}
+          style="--track: ${this.seekTrack(time, range ?? [0, 0])}"
           @input=${this.onSeekInput}
           @change=${this.onSeekChange}
         />

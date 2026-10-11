@@ -27,7 +27,10 @@ describe('canPlayType', () => {
     ['audio/ogg; codecs=vorbis', 'probably'],
     ['audio/wav; codecs="1"', 'probably'],
     ['video/mp4; codecs="av01.0.08M.08"', ''], // no WebCodecs in Node, no sw AV1
-    ['application/x-mpegURL', ''],
+    ['application/x-mpegURL', 'maybe'],
+    ['application/vnd.apple.mpegurl; codecs="avc1.640028, mp4a.40.2"', 'maybe'],
+    ['application/vnd.apple.mpegurl; codecs="avc1.640028, bogus"', ''],
+    ['application/dash+xml', ''],
     ['video/mp4; codecs="avc1.42E01E, bogus"', ''],
   ])('%s -> %s', (type, expected) => {
     expect(canPlayType(type)).toBe(expected);

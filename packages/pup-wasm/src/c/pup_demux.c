@@ -129,6 +129,11 @@ double pup_demux_duration(PupDemux *d) {
   return NAN;
 }
 
+/* The container start time in microseconds: the offset pup_demux_read
+ * subtracts from every timestamp (0 when the container has none). */
+EMSCRIPTEN_KEEPALIVE
+double pup_demux_start_time(PupDemux *d) { return (double)d->start_time; }
+
 EMSCRIPTEN_KEEPALIVE
 const char *pup_demux_format_name(PupDemux *d) { return d->fmt->iformat->name; }
 

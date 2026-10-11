@@ -8,3 +8,4 @@ export { PupTextTrack, PupTextTrackList, PupTextTrackCueList, type PupTextTrackM
 export type { VttCue } from './element/webvtt.js';
 export { canPlayType } from './element/can-play-type.js';
 export { PupEngine, type EngineOptions, type EngineStats, type SourceProvider } from './engine/engine.js';
+export type { HlsStats } from './engine/protocol.js';

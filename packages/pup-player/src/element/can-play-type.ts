@@ -100,10 +100,14 @@ const CODECS: Array<[RegExp, string | null, boolean]> = [
   [/^1$/, 'pcm_s16le', false], // WAV codecs="1"
 ];
 
+/** HLS playlists; segments are MPEG-TS or fMP4 (lite has no MPEG-TS demuxer). */
+const HLS = ['application/vnd.apple.mpegurl', 'application/x-mpegurl', 'audio/mpegurl', 'audio/x-mpegurl'];
+
 export function canPlayType(type: string, set: CodecSet = 'full'): CanPlayTypeResult {
   const config = set === 'lite' ? liteConfig : fullConfig;
   const [mime, ...params] = type.split(';').map((s) => s.trim());
-  const demuxer = CONTAINERS[mime.toLowerCase()];
+  const hls = HLS.includes(mime.toLowerCase());
+  const demuxer = hls ? 'mov' : CONTAINERS[mime.toLowerCase()];
   if (!demuxer || !config.demuxers.includes(demuxer)) return '';
 
   const codecsParam = params.find((p) => /^codecs\s*=/i.test(p));
@@ -130,5 +134,6 @@ export function canPlayType(type: string, set: CodecSet = 'full'): CanPlayTypeRe
     }
     return '';
   }
-  return result;
+  // Whether an HLS stream plays also depends on its segments' container.
+  return hls ? 'maybe' : result;
 }

@@ -119,6 +119,26 @@ export class Core {
   hasDecoderName(name: string): boolean {
     return this.withString(name, (p) => this.m._pup_has_decoder_name(p)) !== 0;
   }
+
+  /**
+   * Decrypts AES-128-CBC data (HLS METHOD=AES-128) and removes its PKCS#7
+   * padding. `key` and `iv` are 16 bytes. Returns a new array.
+   */
+  decryptAes128(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Uint8Array {
+    if (key.length !== 16 || iv.length !== 16) throw new DemuxError('AES-128 needs a 16-byte key and IV', 0);
+    const { m } = this;
+    const ptr = m._malloc(32 + data.length);
+    try {
+      this.u8.set(key, ptr);
+      this.u8.set(iv, ptr + 16);
+      this.u8.set(data, ptr + 32);
+      const n = m._pup_aes128_cbc_decrypt(ptr, ptr + 16, ptr + 32, data.length);
+      if (n < 0) throw new DemuxError(`AES-128 decryption failed: ${this.errorString(n)}`, n);
+      return this.u8.slice(ptr + 32, ptr + 32 + n);
+    } finally {
+      m._free(ptr);
+    }
+  }
 }
 
 export async function loadCore(opts: LoadOptions = {}): Promise<Core> {
@@ -205,6 +225,14 @@ export class Demuxer {
   /** Seconds, NaN if unknown. */
   get duration(): number {
     return this.core.m._pup_demux_duration(this.ptr) / 1e6;
+  }
+
+  /**
+   * The container's start time in seconds (0 if it has none). Packet times are
+   * relative to it; adding it back gives the raw container timestamps.
+   */
+  get startTime(): number {
+    return this.core.m._pup_demux_start_time(this.ptr) / 1e6;
   }
 
   streams(): StreamInfo[] {
