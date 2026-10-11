@@ -109,6 +109,8 @@ pnpm test:e2e                        # Playwright: Chromium + Firefox, starts th
 
 ## Releases
 
+Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
 `.github/workflows/build.yml` runs only when started by hand (Actions → build → Run workflow):
 
 - `run_tests` (checkbox) adds typecheck, unit and Chromium e2e tests.
