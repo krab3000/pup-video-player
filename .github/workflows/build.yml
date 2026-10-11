@@ -197,8 +197,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           REF_TYPE: ${{ github.ref_type }}
         run: |
-          target=()
-          [ "$REF_TYPE" = "tag" ] || target=(--target "$GITHUB_SHA")
-          gh release create "v$VERSION" "${target[@]}" --title "v$VERSION" \
+          flags=()
+          [ "$REF_TYPE" = "tag" ] || flags+=(--target "$GITHUB_SHA")
+          case "$VERSION" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "v$VERSION" "${flags[@]}" --title "v$VERSION" \
             --notes "npm packages: @krab3000/pup-wasm, @krab3000/pup-player, @krab3000/pup-player-bundle $VERSION (GitHub Packages). The FFmpeg source the wasm cores were built from is attached (LGPL-2.1)." \
             out/*.tgz out/pup-player-bundle-*.zip out/ffmpeg-*.tar.xz
