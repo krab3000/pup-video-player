@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   meta:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -44,7 +44,7 @@ jobs:
 
   wasm:
     needs: meta
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 240
     permissions:
       contents: read
@@ -54,15 +54,16 @@ jobs:
       # FFmpeg stages (by far the slowest part) stay cached between occasional manual runs.
       CACHE_REF: ghcr.io/${{ github.repository }}:buildcache
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - run: git config --global init.defaultBranch master # silences git's default-branch hint in checkout
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build wasm cores
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: packages/pup-wasm
           outputs: type=local,dest=packages/pup-wasm/dist
@@ -70,19 +71,19 @@ jobs:
           cache-to: type=registry,ref=${{ env.CACHE_REF }},mode=max,image-manifest=true,oci-mediatypes=true
       - name: Export FFmpeg source (LGPL)
         if: needs.meta.outputs.version != ''
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: packages/pup-wasm
           target: ffmpeg-source
           outputs: type=local,dest=release-src
           cache-from: type=registry,ref=${{ env.CACHE_REF }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wasm-dist
           path: packages/pup-wasm/dist
           if-no-files-found: error
       - if: needs.meta.outputs.version != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-source
           path: release-src
@@ -91,17 +92,18 @@ jobs:
   test:
     needs: wasm
     if: inputs.run_tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - run: git config --global init.defaultBranch master # silences git's default-branch hint in checkout
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: wasm-dist
           path: packages/pup-wasm/dist
@@ -120,16 +122,17 @@ jobs:
     needs: [meta, wasm, test]
     # Runs after the tests when they were requested, and right after the wasm build otherwise.
     if: ${{ !failure() && !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - run: git config --global init.defaultBranch master # silences git's default-branch hint in checkout
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: wasm-dist
           path: packages/pup-wasm/dist
@@ -147,7 +150,7 @@ jobs:
           cp packages/pup-player-bundle/LICENSE packages/pup-player-bundle/README.md packages/pup-player-bundle/dist/
           (cd packages/pup-player-bundle/dist && zip -qr "$GITHUB_WORKSPACE/out/pup-player-bundle-$version.zip" .)
           ls -la out
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: packages
           path: out
@@ -156,23 +159,23 @@ jobs:
   publish:
     needs: [meta, package]
     if: ${{ !failure() && !cancelled() && needs.meta.outputs.version != '' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write # GitHub Release
       packages: write # GitHub Packages
     env:
       VERSION: ${{ needs.meta.outputs.version }}
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           registry-url: https://npm.pkg.github.com
           scope: "@krab3000"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: packages
           path: out
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ffmpeg-source
           path: out

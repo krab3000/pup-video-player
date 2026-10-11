@@ -21,7 +21,10 @@ link_core() {
     --js-library "$ROOT/src/c/pup_io.js"
   )
   if [ "$THREADING" = "mt" ]; then
-    link_flags+=(-pthread -sPTHREAD_POOL_SIZE=Module.pthreadPoolSize -sDEFAULT_PTHREAD_STACK_SIZE=2MB)
+    # -Wno-pthreads-mem-growth: growing a shared heap detaches JS views of it, which the bindings
+    # already handle (Core re-creates its views whenever the buffer changes). The suggested
+    # -sGROWABLE_ARRAYBUFFERS needs growable SharedArrayBuffer support that older browsers lack.
+    link_flags+=(-pthread -sPTHREAD_POOL_SIZE=Module.pthreadPoolSize -sDEFAULT_PTHREAD_STACK_SIZE=2MB -Wno-pthreads-mem-growth)
   fi
 
   # shellcheck disable=SC2086
