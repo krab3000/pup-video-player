@@ -57,6 +57,12 @@ export interface EngineStats {
 
 type Deferred = { resolve: () => void; reject: (e: unknown) => void };
 
+/**
+ * Yields the next candidate of a <source> list, or null when none is left.
+ * Called again each time a candidate fails before its metadata loaded.
+ */
+export type SourceProvider = () => Source | null;
+
 export class PupEngine {
   // HTMLMediaElement-visible state
   duration = NaN;
@@ -94,6 +100,7 @@ export class PupEngine {
 
   private epoch = 0;
   private source: Source | null = null;
+  private sourceProvider: SourceProvider | null = null;
   private opened = false;
   private configured = false;
   private clock = new MediaClock();
@@ -172,21 +179,33 @@ export class PupEngine {
     return ranges;
   }
 
-  /** Starts loading `source` (null unloads), mirroring the media element load algorithm. */
-  load(source: Source | null): void {
+  /**
+   * Starts loading `source` (null unloads), mirroring the media element load
+   * algorithm. With a provider, failures before metadata move on to its next
+   * candidate instead of setting `error`; when it runs out, networkState is
+   * NETWORK_NO_SOURCE and `error` stays null.
+   */
+  load(source: Source | SourceProvider | null): void {
     this.rejectPlay(new DOMException('The play() request was interrupted by a new load request.', 'AbortError'));
     if (this.networkState === NETWORK_LOADING || this.networkState === NETWORK_IDLE) this.emit('abort');
     const hadMedia = this.networkState !== NETWORK_EMPTY;
     this.reset();
     if (hadMedia) this.emit('emptied');
 
-    this.source = source;
     if (!source) {
       this.networkState = NETWORK_EMPTY;
       return;
     }
     this.networkState = NETWORK_LOADING;
+    // Pick the first candidate before loadstart, so listeners see currentSrc.
+    if (typeof source === 'function') {
+      this.sourceProvider = source;
+      this.nextSource();
+    } else {
+      this.source = source;
+    }
     this.emit('loadstart');
+    if (!this.source) return;
     if (this.preload === 'none') {
       this.networkState = NETWORK_IDLE;
       this.emit('suspend');
@@ -296,6 +315,13 @@ export class PupEngine {
     this.emit('ratechange');
   }
 
+  /** Asks the provider again after it ran out (a <source> was inserted meanwhile). */
+  resumeSourceSelection(): void {
+    if (!this.sourceProvider || this.networkState !== NETWORK_NO_SOURCE || this.error) return;
+    this.networkState = NETWORK_LOADING;
+    if (this.nextSource()) this.open();
+  }
+
   destroy(): void {
     this.destroyed = true;
     this.reset();
@@ -322,6 +348,7 @@ export class PupEngine {
     this.clock = new MediaClock();
     this.clock.setRate(this.playbackRate);
     this.source = null;
+    this.sourceProvider = null;
     this.opened = this.configured = false;
     this.info = null;
     this.duration = NaN;
@@ -345,6 +372,23 @@ export class PupEngine {
     this.stats.videoDecoder = 'none';
     this.stats.bytesLoaded = 0;
     this.stats.bytesTotal = -1;
+  }
+
+  private nextSource(): boolean {
+    this.source = this.sourceProvider!();
+    if (!this.source) this.networkState = NETWORK_NO_SOURCE;
+    return this.source !== null;
+  }
+
+  /** A <source> candidate failed before metadata: drop it and open the next one. */
+  private nextCandidate(): void {
+    const { sourceProvider, paused, pendingSeek } = this;
+    this.reset();
+    // Still the same load: keep a pending play() and the start position.
+    this.sourceProvider = sourceProvider;
+    this.paused = paused;
+    this.pendingSeek = pendingSeek;
+    if (this.nextSource()) this.open();
   }
 
   private open(): void {
@@ -573,6 +617,11 @@ export class PupEngine {
   }
 
   private fail(code: MediaErrorCode, message: string): void {
+    if (this.sourceProvider && this.readyState === HAVE_NOTHING) {
+      console.warn(`[pup] source failed (${code}): ${message}`);
+      this.nextCandidate();
+      return;
+    }
     console.error(`[pup] media error ${code}: ${message}`);
     this.error = new PupMediaError(code, message);
     this.stopPlayback();

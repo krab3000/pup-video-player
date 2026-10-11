@@ -1,0 +1,15 @@
+WEBVTT - pup e2e captions
+
+NOTE
+Cue timings fit the 10 s fixtures.
+
+1
+00:00:01.000 --> 00:00:03.000
+First <b>caption</b>
+
+00:04.000 --> 00:06.000 align:start line:0
+Second &amp; top
+
+3
+00:00:07.000 --> 00:00:09.500
+<v Narrator>Third caption</v>

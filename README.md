@@ -69,16 +69,19 @@ main thread               demux worker (wasm st)        decode worker (wasm st|m
 ## HTMLMediaElement API coverage
 
 - **Attributes:** `src`, `srcObject` (Blob or File), `autoplay`, `loop`, `muted` (as `defaultMuted`), `controls`, `preload`, `crossorigin`, `poster`, `width`, `height`, `playsinline`.
-- **Properties:** `currentTime`, `duration`, `paused`, `ended`, `seeking`, `readyState`, `networkState`, `buffered`, `seekable`, `played`, `error` (a MediaError with codes 1–4), `currentSrc`, `volume`, `muted`, `playbackRate`, `defaultPlaybackRate`, `videoWidth`, `videoHeight`, and the `HAVE_*` and `NETWORK_*` constants.
+- **Children:**
+  - `<source>`: without `src`/`srcObject`, candidates are tried in document order. A `type` that `canPlayType()` rejects is skipped. A candidate that fails before its metadata loads (network error, HTTP error, unreadable container) gets an `error` event and the next one is tried. When none is left, `networkState` is `NETWORK_NO_SOURCE` and `error` stays null, like native. Inserting a `<source>` into an empty element starts loading. `media` and `sizes` are ignored.
+  - `<track kind="subtitles|captions">`: `textTracks` lists them with `mode`, `cues`, `activeCues` and `cuechange`. The first `default` track starts `showing`. A track's WebVTT file is fetched when its mode becomes `hidden` or `showing`, and the `<track>` gets `load` or `error`. `<pup-video>` draws the active cues of `showing` tracks over the picture (`::part(captions)`). Only the `line` and `align` cue settings are used, and only `<b>`, `<i>` and `<u>` are rendered. Regions, `::cue` styles and other track kinds are ignored, and `<pup-audio>` doesn't draw captions.
+- **Properties:** `currentTime`, `duration`, `paused`, `ended`, `seeking`, `readyState`, `networkState`, `buffered`, `seekable`, `played`, `error` (a MediaError with codes 1–4), `currentSrc`, `volume`, `muted`, `playbackRate`, `defaultPlaybackRate`, `videoWidth`, `videoHeight`, `textTracks`, and the `HAVE_*` and `NETWORK_*` constants.
 - **Methods:** `play()` (returns a promise that rejects with `NotAllowedError` or `AbortError` like the native one), `pause()`, `load()`, `fastSeek()`, `canPlayType()`.
 - **Events:** loadstart, durationchange, loadedmetadata, loadeddata, canplay, canplaythrough, play, playing, waiting, seeking, seeked, timeupdate, pause, ended, ratechange, volumechange, resize, progress, suspend, emptied, abort, error. The e2e suite checks that the order matches native `<video>`.
-- **Styling:** `pup-video::part(video) { object-fit: cover }`, plus `::part(poster)` and `::part(controls)`.
+- **Styling:** `pup-video::part(video) { object-fit: cover }`, plus `::part(poster)`, `::part(captions)` and `::part(controls)`.
 - **Extras:**
   - `getStats()` returns the decoder in use, threading, decode fps, dropped frames and bytes loaded.
   - `destroy()` frees the workers.
   - `force-software` is a debug attribute; `?forceSoftware` in the page URL does the same.
 
-**Not implemented:** `audioTracks`, `videoTracks` and `textTracks` (the first default stream is played), MediaSource/MediaStream as `srcObject`, and HLS/DASH. Streams without timestamps, such as headerless RealAudio 1.0 `.ra`, play from the start but can't be seeked. When a container records no duration, `duration` is estimated from size and bitrate and corrected (with `durationchange`) when playback reaches the end.
+**Not implemented:** `audioTracks` and `videoTracks` (the first default stream is played), subtitle streams inside the media file (`textTracks` only covers WebVTT `<track>` children), `addTextTrack()`, MediaSource/MediaStream as `srcObject`, and HLS/DASH. Streams without timestamps, such as headerless RealAudio 1.0 `.ra`, play from the start but can't be seeked. When a container records no duration, `duration` is estimated from size and bitrate and corrected (with `durationchange`) when playback reaches the end.
 
 **Autoplay:** audio is played through an AudioContext, so unmuted autoplay follows the Web Audio autoplay policy. In real browsers this matches the media-element policy. Muted autoplay always works: audio is skipped and playback runs on the wall clock until the element is unmuted.
 

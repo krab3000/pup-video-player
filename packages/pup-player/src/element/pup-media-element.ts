@@ -21,7 +21,10 @@ import type { Source } from '../engine/protocol.js';
 import type { Renderer } from '../engine/renderer.js';
 import { canPlayType } from './can-play-type.js';
 import type { PupMediaError } from './media-error.js';
+import { selectSource } from './source-selection.js';
+import { activeCuesAt, PupTextTrack, PupTextTrackList, sameCues, type PupTextTrackKind } from './text-tracks.js';
 import { PupTimeRanges } from './time-ranges.js';
+import { parseWebVTT, type VttCue } from './webvtt.js';
 
 /** Events the controls (and subclasses) re-render on. */
 export const MEDIA_EVENTS = [
@@ -70,6 +73,24 @@ export abstract class PupMediaElement extends LitElement {
   private _loadQueued = false;
   private _autoplayArmed = false;
   private _mutedInitialized = false;
+  /** <source> resource selection: the candidate being tried, and where the next search starts. */
+  private _sourceElement: HTMLSourceElement | null = null;
+  private _sourceNext = 0;
+  private readonly _textTracks = new PupTextTrackList();
+  private readonly _trackFor = new Map<HTMLTrackElement, PupTextTrack>();
+
+  constructor() {
+    super();
+    new MutationObserver((records) => this.onChildrenChanged(records)).observe(this, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['kind', 'src'],
+    });
+    for (const type of ['timeupdate', 'seeking', 'seeked', 'emptied', 'loadeddata']) {
+      this.addEventListener(type, () => this.updateCues());
+    }
+  }
 
   protected abstract get renderer(): Renderer | null;
 
@@ -96,6 +117,9 @@ export abstract class PupMediaElement extends LitElement {
       this._mutedInitialized = true;
       if (this.hasAttribute('muted')) this.engine.muted = true;
     }
+    // Upgraded with children already in place: no mutation records for them.
+    this.syncTextTracks();
+    if (this.childSources().length && !this.src && !this._srcObject && this.networkState === NETWORK_EMPTY) this.queueLoad();
   }
 
   disconnectedCallback(): void {
@@ -162,10 +186,81 @@ export abstract class PupMediaElement extends LitElement {
       const url = new URL(this.src, document.baseURI).href;
       source = { kind: 'url', url, withCredentials: this.crossOrigin === 'use-credentials' };
       this._currentSrc = url;
+    } else if (this.childSources().length) {
+      // Not keyed on the src attribute: Lit reflects the empty default as src="".
+      this._currentSrc = '';
+      this._sourceElement = null;
+      this._sourceNext = 0;
+      engine.load(() => this.nextSource());
+      return;
     } else {
       this._currentSrc = '';
     }
     engine.load(source);
+  }
+
+  private childSources(): HTMLSourceElement[] {
+    return [...this.children].filter((c): c is HTMLSourceElement => c instanceof HTMLSourceElement);
+  }
+
+  /**
+   * Engine source provider: fails the candidate being tried (if any) and
+   * returns the next playable <source> after it, in document order.
+   */
+  private nextSource(): Source | null {
+    const fireError = (el: Element) => queueMicrotask(() => el.dispatchEvent(new Event('error')));
+    if (this._sourceElement) fireError(this._sourceElement);
+    const sources = this.childSources();
+    // Continue after the failed candidate, or at its old slot if it was removed.
+    let from = this._sourceElement && sources.includes(this._sourceElement) ? sources.indexOf(this._sourceElement) + 1 : this._sourceNext;
+    this._sourceElement = null;
+    const candidates = sources.map((s) => ({ src: s.getAttribute('src'), type: s.getAttribute('type') }));
+    for (;;) {
+      const { index, rejected } = selectSource(candidates, from, (type) => this.canPlayType(type));
+      for (const i of rejected) fireError(sources[i]);
+      if (index < 0) {
+        this._sourceNext = sources.length;
+        return null;
+      }
+      from = this._sourceNext = index + 1;
+      let url: string;
+      try {
+        url = new URL(candidates[index].src!, document.baseURI).href;
+      } catch {
+        fireError(sources[index]);
+        continue;
+      }
+      this._sourceElement = sources[index];
+      this._currentSrc = url;
+      return { kind: 'url', url, withCredentials: this.crossOrigin === 'use-credentials' };
+    }
+  }
+
+  private onChildrenChanged(records: MutationRecord[]): void {
+    let sourceAdded = false;
+    let tracksChanged = false;
+    for (const r of records) {
+      if (r.type === 'attributes') {
+        if (r.target.parentNode !== this || !(r.target instanceof HTMLTrackElement)) continue;
+        tracksChanged = true;
+        // A new src resets the track; it reloads if it is in use.
+        const track = this._trackFor.get(r.target);
+        if (track && r.attributeName === 'src') this.resetTrack(track, r.target);
+        continue;
+      }
+      if (r.target !== this) continue;
+      for (const node of [...r.addedNodes, ...r.removedNodes]) {
+        if (node instanceof HTMLTrackElement) tracksChanged = true;
+      }
+      if ([...r.addedNodes].some((n) => n instanceof HTMLSourceElement)) sourceAdded = true;
+    }
+    if (tracksChanged) this.syncTextTracks();
+    if (sourceAdded && !this.src && !this._srcObject) {
+      // Like native: inserting a <source> starts loading an empty element, or
+      // resumes a selection that ran out of candidates.
+      if (this.networkState === NETWORK_EMPTY) this.queueLoad();
+      else if (this.networkState === NETWORK_NO_SOURCE) this._engine?.resumeSourceSelection();
+    }
   }
 
   canPlayType(type: string): CanPlayTypeResult {
@@ -283,6 +378,102 @@ export abstract class PupMediaElement extends LitElement {
     if (!Number.isFinite(rate) || rate < 0 || (rate > 0 && (rate < 0.0625 || rate > 16))) {
       throw new DOMException(`The provided playback rate (${rate}) is not in the supported playback range.`, 'NotSupportedError');
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Text tracks (WebVTT subtitles/captions from <track> children)
+
+  get textTracks(): PupTextTrackList {
+    return this._textTracks;
+  }
+
+  /** Active cues of the 'showing' tracks, for subclasses that render captions. */
+  protected get showingCues(): VttCue[] {
+    return [...this._textTracks].filter((t) => t.mode === 'showing').flatMap((t) => [...t.activeCues]);
+  }
+
+  /** Rebuilds textTracks from the eligible <track> children, keeping existing TextTrack objects. */
+  private syncTextTracks(): void {
+    const tracks: PupTextTrack[] = [];
+    const elements = new Set<HTMLTrackElement>();
+    let hasDefault = [...this._trackFor.values()].some((t) => t.mode !== 'disabled');
+    for (const el of this.children) {
+      if (!(el instanceof HTMLTrackElement)) continue;
+      const kind = (el.getAttribute('kind') || 'subtitles').toLowerCase();
+      if (kind !== 'subtitles' && kind !== 'captions') continue;
+      let track = this._trackFor.get(el);
+      if (track && track.kind !== kind) {
+        track.mode = 'disabled';
+        track = undefined;
+      }
+      if (!track) {
+        track = new PupTextTrack(kind as PupTextTrackKind, el, (t) => this.onTrackModeChange(t, el));
+        this._trackFor.set(el, track);
+        if (!hasDefault && el.hasAttribute('default')) {
+          hasDefault = true;
+          track.mode = 'showing';
+        }
+      }
+      elements.add(el);
+      tracks.push(track);
+    }
+    for (const [el, track] of this._trackFor) {
+      if (elements.has(el) && tracks.includes(track)) continue;
+      this._trackFor.delete(el);
+      track._readyState = 0;
+    }
+    this._textTracks._set(tracks);
+    this.updateCues();
+  }
+
+  private onTrackModeChange(track: PupTextTrack, el: HTMLTrackElement): void {
+    queueMicrotask(() => this._textTracks.dispatchEvent(new Event('change')));
+    if (track.mode !== 'disabled' && track._readyState === 0) void this.loadTrack(track, el);
+    this.updateCues();
+    this.requestUpdate();
+  }
+
+  private resetTrack(track: PupTextTrack, el: HTMLTrackElement): void {
+    track._readyState = 0;
+    track.cues._set([]);
+    if (track.mode !== 'disabled') void this.loadTrack(track, el);
+    this.updateCues();
+  }
+
+  private async loadTrack(track: PupTextTrack, el: HTMLTrackElement): Promise<void> {
+    track._readyState = 1;
+    const src = el.getAttribute('src');
+    let cues: VttCue[] | null = null;
+    try {
+      if (!src) throw new Error('<track> has no src');
+      const credentials = this.crossOrigin === 'use-credentials' ? 'include' : 'same-origin';
+      const res = await fetch(new URL(src, document.baseURI), { credentials });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      cues = parseWebVTT(await res.text());
+    } catch (e) {
+      console.warn(`[pup] text track ${src} failed:`, e);
+    }
+    // Reset (src changed or removed) while fetching.
+    if (track._readyState !== 1 || el.getAttribute('src') !== src) return;
+    track._readyState = cues ? 2 : 3;
+    if (cues) track.cues._set(cues);
+    el.dispatchEvent(new Event(cues ? 'load' : 'error'));
+    this.updateCues();
+  }
+
+  /** Recomputes activeCues of every track, firing cuechange where the set changed. */
+  private updateCues(): void {
+    const time = this.currentTime;
+    let changed = false;
+    for (const [el, track] of this._trackFor) {
+      const active = track.mode === 'disabled' ? [] : activeCuesAt([...track.cues], time);
+      if (sameCues(active, track.activeCues)) continue;
+      track.activeCues._set(active);
+      changed = true;
+      track.dispatchEvent(new Event('cuechange'));
+      el.dispatchEvent(new Event('cuechange'));
+    }
+    if (changed) this.requestUpdate();
   }
 
   // -------------------------------------------------------------------------
