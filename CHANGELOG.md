@@ -7,6 +7,8 @@ All notable changes to pup-video-player are documented here. The format is based
 
 ## [Unreleased]
 
+## [0.2.0-rc.1] - 2026-10-11
+
 ### Added
 - `<source>` children work like they do in `<video>`. With no `src` or `srcObject`, the element picks the first `<source>` whose `type` is empty or playable (`canPlayType`). If that file can't be opened (a network error, an HTTP error or an unsupported container), the element fires `error` on that `<source>` and tries the next one. When none is left, `networkState` becomes `NETWORK_NO_SOURCE` and `error` stays `null`. A `<source>` added to an empty element starts loading. A `<source>` added after every candidate failed resumes selection from it. `currentSrc` reports the chosen file.
 - Captions from WebVTT `<track>` children:
@@ -41,5 +43,6 @@ First release.
 - A manually started release workflow. It builds the cores with a registry layer cache, optionally runs the tests, and publishes the packages and a GitHub Release (with the FFmpeg source, for the LGPL) when given a version or started on a tag.
 - LGPL-2.1 license text in every package.
 
-[Unreleased]: https://github.com/krab3000/pup-video-player/compare/v0.1.0-rc.1...HEAD
+[Unreleased]: https://github.com/krab3000/pup-video-player/compare/v0.2.0-rc.1...HEAD
+[0.2.0-rc.1]: https://github.com/krab3000/pup-video-player/compare/v0.1.0-rc.1...v0.2.0-rc.1
 [0.1.0-rc.1]: https://github.com/krab3000/pup-video-player/releases/tag/v0.1.0-rc.1
