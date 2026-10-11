@@ -1,3 +1,5 @@
+import { statSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { mount, mounted, waitFor } from './helpers';
 
@@ -69,7 +71,8 @@ test('reads large URLs with Range requests instead of downloading them', async (
   await waitFor(page, 'el.readyState >= 2');
   await page.waitForTimeout(500);
   const { bytesLoaded, bytesTotal } = await page.evaluate(() => el.getStats() as { bytesLoaded: number; bytesTotal: number });
-  expect(bytesTotal).toBeGreaterThan(6.5 * 1024 * 1024); // ~6.8 MiB file
+  // The fixture's size depends on the ffmpeg build that generated it; compare with the real file.
+  expect(bytesTotal).toBe(statSync(join(process.cwd(), 'test-media/h264-1080p-video-only.mp4')).size);
   expect(bytesLoaded).toBeGreaterThan(0);
   expect(bytesLoaded).toBeLessThan(bytesTotal * 0.75);
   // Firefox doesn't surface worker sync XHRs to Playwright.

@@ -15,6 +15,8 @@ export default defineConfig({
 });
 ```
 
+The multi-threaded FFmpeg core is used only on cross-origin isolated pages: serve the page with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, and the app's JS assets (the workers) with `Cross-Origin-Embedder-Policy: require-corp` as well. Without isolation the single-threaded core is used.
+
 Installing from GitHub Packages needs `@krab3000:registry=https://npm.pkg.github.com` in `.npmrc` and a token with `read:packages`.
 
 License: LGPL-2.1-or-later.

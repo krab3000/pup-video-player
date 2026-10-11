@@ -19,7 +19,10 @@ The workers and wasm load relative to `pup-player.js`, so the folder can live un
 The bundle contains four FFmpeg cores and the browser downloads only one:
 
 - **Codec set**: `full` (default, ~3.6 MB gzipped: AVI, WMV, FLV, MKV, TS, RealMedia, AC-3, DTS, …) or `lite` (~0.9 MB gzipped: MP4/MKV/WebM/Ogg with common codecs). Choose it per element: `<pup-video codec-set="lite">`.
-- **Threading**: the multi-threaded core is picked automatically when the page is cross-origin isolated. Serve the page with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. Without those headers the single-threaded core is used.
+- **Threading**: the multi-threaded core is picked automatically when the page is cross-origin isolated, otherwise the single-threaded one is used. To enable it:
+  - serve the page with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`;
+  - serve the bundle's files (at least `assets/*.js`) with `Cross-Origin-Embedder-Policy: require-corp` too. An isolated page refuses to start workers whose script lacks it, and playback then fails with "worker failed";
+  - media and other resources from a different origin need CORS or `Cross-Origin-Resource-Policy` headers.
 
 ## License
 
