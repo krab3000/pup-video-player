@@ -1,19 +1,38 @@
 {
-  "name": "@pup/player",
+  "name": "@krab3000/pup-player",
   "version": "0.1.0",
   "type": "module",
   "description": "<pup-video> / <pup-audio>: media elements backed by FFmpeg (wasm) and WebCodecs",
   "license": "LGPL-2.1-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/krab3000/pup-video-player.git",
+    "directory": "packages/pup-player"
+  },
   "exports": {
     ".": "./src/index.ts"
   },
-  "files": ["src"],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "exports": {
+      ".": {
+        "types": "./lib/index.d.ts",
+        "import": "./lib/index.js"
+      }
+    }
+  },
+  "files": [
+    "lib",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
+    "build": "rm -rf lib && tsc -p tsconfig.build.json && node scripts/postbuild.mjs && node ../../scripts/copy-license.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@pup/wasm": "workspace:*",
+    "@krab3000/pup-wasm": "workspace:*",
     "lit": "^3.3.1"
   },
   "devDependencies": {

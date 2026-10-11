@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canPlayType } from '../src/element/can-play-type';
-import { PupTimeRanges } from '../src/element/time-ranges';
-import { MediaClock } from '../src/engine/clock';
+import { canPlayType } from '../src/element/can-play-type.js';
+import { PupTimeRanges } from '../src/element/time-ranges.js';
+import { MediaClock } from '../src/engine/clock.js';
 
 // DOMException exists in Node; that's all TimeRanges needs.
 

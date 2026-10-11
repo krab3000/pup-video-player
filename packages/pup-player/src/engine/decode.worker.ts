@@ -3,7 +3,7 @@
 // output queues are below target, sends VideoFrames to the main thread and
 // PCM straight to the audio worklet.
 
-import { Decoder, loadCore, type Core, type DecodedAudio, type DecodedVideo, type Packet, type StreamInfo } from '@pup/wasm';
+import { Decoder, loadCore, type Core, type DecodedAudio, type DecodedVideo, type Packet, type StreamInfo } from '@krab3000/pup-wasm';
 import {
   MediaErrorCode,
   type AudioMode,
@@ -14,7 +14,7 @@ import {
   type ToDecode,
   type ToWorkletData,
   type WorkletToDecode,
-} from './protocol';
+} from './protocol.js';
 
 /** VideoFrames sent to main and not yet consumed. */
 const VIDEO_AHEAD = 6;

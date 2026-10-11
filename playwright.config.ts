@@ -9,11 +9,19 @@ export default defineConfig({
   workers: 3,
   reporter: [['list']],
   use: { baseURL: `http://localhost:${PORT}` },
-  webServer: {
-    command: `pnpm --filter demo exec vite --port ${PORT} --strictPort`,
-    url: `http://localhost:${PORT}`,
-    reuseExistingServer: true,
-  },
+  webServer: [
+    {
+      command: `pnpm --filter demo exec vite --port ${PORT} --strictPort`,
+      url: `http://localhost:${PORT}`,
+      reuseExistingServer: true,
+    },
+    {
+      // Serves the built standalone bundle untouched, for e2e/bundle.spec.ts.
+      command: 'node e2e/static-server.mjs 5198',
+      url: 'http://localhost:5198/',
+      reuseExistingServer: true,
+    },
+  ],
   projects: [
     {
       name: 'chromium',

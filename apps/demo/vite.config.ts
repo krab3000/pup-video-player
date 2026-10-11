@@ -29,6 +29,6 @@ export default defineConfig({
   plugins: [isolation()],
   server: { fs: { allow: ['../..'] } },
   worker: { format: 'es' },
-  optimizeDeps: { exclude: ['@pup/wasm', '@pup/player'] },
+  optimizeDeps: { exclude: ['@krab3000/pup-wasm', '@krab3000/pup-player'] },
   build: { target: 'es2022' },
 });

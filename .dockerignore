@@ -1,0 +1,11 @@
+# Used when this checkout is passed to Cove's Docker build as the `pup` build context. Only the
+# package sources and the prebuilt wasm in packages/pup-wasm/dist are needed.
+**/node_modules
+**/.git
+apps
+e2e
+test-media
+test-results
+packages/pup-wasm/emsdk
+packages/pup-wasm/build
+packages/pup-wasm/third_party

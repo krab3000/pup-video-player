@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing, svg, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { MEDIA_EVENTS, type PupMediaElement } from './pup-media-element';
+import { MEDIA_EVENTS, type PupMediaElement } from './pup-media-element.js';
 
 const HIDE_AFTER_MS = 2500;
 const RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];

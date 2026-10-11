@@ -1,0 +1,197 @@
+# Builds the FFmpeg wasm cores and the npm packages. Manual only: nothing runs on push or tags.
+#
+# Publishing to GitHub Packages (and creating a GitHub Release) happens only when a version is
+# known: either the `version` input is set, or the workflow is run on a tag ref (v1.2.3 -> 1.2.3).
+# Every other run just builds and uploads the packages as workflow artifacts.
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish (e.g. 0.2.0). Leave empty to only build; on a tag ref the tag is used.
+        type: string
+        default: ""
+      run_tests:
+        description: Run typecheck, unit and e2e tests
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version="$INPUT_VERSION"
+          if [ -z "$version" ] && [ "$REF_TYPE" = "tag" ]; then version="${REF_NAME#v}"; fi
+          if [ -n "$version" ] && ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$version' is not a semver version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ -n "$version" ]; then echo "Publishing $version"; else echo "Build only (no version)"; fi
+
+  wasm:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write # BuildKit layer cache in GHCR
+    env:
+      # Registry cache: unlike the GHA cache it does not expire after a week without use, so the
+      # FFmpeg stages (by far the slowest part) stay cached between occasional manual runs.
+      CACHE_REF: ghcr.io/${{ github.repository }}:buildcache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build wasm cores
+        uses: docker/build-push-action@v6
+        with:
+          context: packages/pup-wasm
+          outputs: type=local,dest=packages/pup-wasm/dist
+          cache-from: type=registry,ref=${{ env.CACHE_REF }}
+          cache-to: type=registry,ref=${{ env.CACHE_REF }},mode=max,image-manifest=true,oci-mediatypes=true
+      - name: Export FFmpeg source (LGPL)
+        if: needs.meta.outputs.version != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: packages/pup-wasm
+          target: ffmpeg-source
+          outputs: type=local,dest=release-src
+          cache-from: type=registry,ref=${{ env.CACHE_REF }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-dist
+          path: packages/pup-wasm/dist
+          if-no-files-found: error
+      - if: needs.meta.outputs.version != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-source
+          path: release-src
+          if-no-files-found: error
+
+  test:
+    needs: wasm
+    if: inputs.run_tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: wasm-dist
+          path: packages/pup-wasm/dist
+      - name: Generate test media
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+          bash test-media/generate.sh
+          bash test-media/generate-legacy.sh
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test --project=chromium
+
+  package:
+    needs: [meta, wasm, test]
+    # Runs after the tests when they were requested, and right after the wasm build otherwise.
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: wasm-dist
+          path: packages/pup-wasm/dist
+      - name: Set version
+        if: needs.meta.outputs.version != ''
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: pnpm -r --filter './packages/**' exec npm pkg set "version=$VERSION"
+      - run: pnpm build
+      - name: Pack
+        run: |
+          mkdir -p out
+          pnpm -r --filter './packages/**' exec pnpm pack --pack-destination "$GITHUB_WORKSPACE/out"
+          version="$(node -p "require('./packages/pup-player-bundle/package.json').version")"
+          cp packages/pup-player-bundle/LICENSE packages/pup-player-bundle/README.md packages/pup-player-bundle/dist/
+          (cd packages/pup-player-bundle/dist && zip -qr "$GITHUB_WORKSPACE/out/pup-player-bundle-$version.zip" .)
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: out
+          if-no-files-found: error
+
+  publish:
+    needs: [meta, package]
+    if: ${{ !failure() && !cancelled() && needs.meta.outputs.version != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # GitHub Release
+      packages: write # GitHub Packages
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@krab3000"
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: out
+      - uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-source
+          path: out
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Dependency order: the player depends on the wasm package.
+          for name in pup-wasm pup-player pup-player-bundle; do
+            npm publish "out/krab3000-$name-$VERSION.tgz"
+          done
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          target=()
+          [ "$REF_TYPE" = "tag" ] || target=(--target "$GITHUB_SHA")
+          gh release create "v$VERSION" "${target[@]}" --title "v$VERSION" \
+            --notes "npm packages: @krab3000/pup-wasm, @krab3000/pup-player, @krab3000/pup-player-bundle $VERSION (GitHub Packages). The FFmpeg source the wasm cores were built from is attached (LGPL-2.1)." \
+            out/*.tgz out/pup-player-bundle-*.zip out/ffmpeg-*.tar.xz

@@ -1,8 +1,8 @@
 import { css, html, nothing } from 'lit';
 import { customElement } from 'lit/decorators.js';
-import type { Renderer } from '../engine/renderer';
-import './pup-controls';
-import { PupMediaElement } from './pup-media-element';
+import type { Renderer } from '../engine/renderer.js';
+import './pup-controls.js';
+import { PupMediaElement } from './pup-media-element.js';
 
 /** <pup-audio>: drop-in replacement for <audio>. Hidden unless `controls` is set. */
 @customElement('pup-audio')

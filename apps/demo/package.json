@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@pup/player": "workspace:*"
+    "@krab3000/pup-player": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

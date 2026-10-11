@@ -1,0 +1,32 @@
+{
+  "name": "@krab3000/pup-player-bundle",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Standalone <pup-video> / <pup-audio>: one script tag, no bundler (lit, workers and FFmpeg wasm included)",
+  "license": "LGPL-2.1-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/krab3000/pup-video-player.git",
+    "directory": "packages/pup-player-bundle"
+  },
+  "exports": {
+    ".": "./dist/pup-player.js",
+    "./*": "./dist/*"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "vite build && node ../../scripts/copy-license.mjs"
+  },
+  "devDependencies": {
+    "@krab3000/pup-player": "workspace:*",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5"
+  }
+}

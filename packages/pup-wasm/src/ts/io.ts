@@ -2,7 +2,7 @@
 // must only be used inside a worker (sync XHR and FileReaderSync are
 // worker-only for array buffers anyway).
 
-import type { CoreModule, IOHandler } from './bindings';
+import type { CoreModule, IOHandler } from './bindings.js';
 
 // Worker-only API, absent from the DOM lib.
 declare const FileReaderSync: { new (): { readAsArrayBuffer(blob: Blob): ArrayBuffer } };

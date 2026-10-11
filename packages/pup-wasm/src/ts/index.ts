@@ -1,4 +1,3 @@
-export * from './bindings';
-export * from './io';
-export { default as fullConfig } from '../../configs/full.json';
-export { default as liteConfig } from '../../configs/lite.json';
+export * from './bindings.js';
+export * from './io.js';
+export * from './configs.js';

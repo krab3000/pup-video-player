@@ -20,7 +20,7 @@ importers:
 
   apps/demo:
     dependencies:
-      '@pup/player':
+      '@krab3000/pup-player':
         specifier: workspace:*
         version: link:../../packages/pup-player
     devDependencies:
@@ -33,7 +33,7 @@ importers:
 
   packages/pup-player:
     dependencies:
-      '@pup/wasm':
+      '@krab3000/pup-wasm':
         specifier: workspace:*
         version: link:../pup-wasm
       lit:
@@ -46,6 +46,18 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.2)
+
+  packages/pup-player-bundle:
+    devDependencies:
+      '@krab3000/pup-player':
+        specifier: workspace:*
+        version: link:../pup-player
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vite:
+        specifier: ^7.1.5
+        version: 7.3.7(@types/node@24.19.2)
 
   packages/pup-wasm:
     devDependencies:

@@ -1,23 +1,41 @@
 {
-  "name": "@pup/wasm",
+  "name": "@krab3000/pup-wasm",
   "version": "0.1.0",
   "type": "module",
   "description": "FFmpeg (Emscripten) demux/decode core for pup-video-player",
   "license": "LGPL-2.1-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/krab3000/pup-video-player.git",
+    "directory": "packages/pup-wasm"
+  },
   "exports": {
     ".": "./src/ts/index.ts",
     "./configs/*": "./configs/*",
     "./dist/*": "./dist/*"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "exports": {
+      ".": {
+        "types": "./lib/ts/index.d.ts",
+        "import": "./lib/ts/index.js"
+      },
+      "./configs/*": "./configs/*",
+      "./dist/*": "./dist/*"
+    }
+  },
   "files": [
-    "src/ts",
+    "lib",
     "dist",
-    "configs"
+    "configs",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
-    "setup": "./scripts/setup-emsdk.sh && ./scripts/fetch-ffmpeg.sh",
-    "build": "./scripts/build.sh all",
-    "build:full-st": "./scripts/build.sh full st",
+    "build:wasm": "docker buildx build . --output type=local,dest=dist",
+    "build:wasm:source": "docker buildx build . --target ffmpeg-source --output type=local,dest=release",
+    "build": "rm -rf lib && tsc -p tsconfig.build.json && node ../../scripts/copy-license.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p ."
   },

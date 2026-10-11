@@ -2,7 +2,7 @@
 // the audio worklet. Every message that refers to a playback position carries
 // an `epoch`; a load or seek bumps it and receivers drop older messages.
 
-import type { CodecSet, Packet, StreamInfo } from '@pup/wasm';
+import type { CodecSet, Packet, StreamInfo } from '@krab3000/pup-wasm';
 
 export type Source = { kind: 'url'; url: string; withCredentials: boolean } | { kind: 'blob'; blob: Blob };
 

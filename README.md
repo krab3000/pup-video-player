@@ -8,9 +8,8 @@
 This lets them play MKV, MPEG-TS, AVI, HEVC/AC-3, MPEG-2, FLAC and other formats with the same API and events as a native media element.
 
 ```html
-<script type="module">
-  import '@pup/player';
-</script>
+<!-- Standalone bundle (@krab3000/pup-player-bundle): no bundler, no other JS -->
+<script type="module" src="/pup/pup-player.js"></script>
 
 <pup-video src="movie.mkv" controls poster="poster.jpg"></pup-video>
 <pup-audio src="track.flac" controls></pup-audio>
@@ -29,8 +28,9 @@ v.srcObject = fileFromInput; // Blob / File
 
 | Path | What |
 | --- | --- |
-| [packages/pup-wasm](packages/pup-wasm) | FFmpeg build scripts, the flat C API (`pup_*`), TS bindings, and synchronous Range/Blob readers |
+| [packages/pup-wasm](packages/pup-wasm) | FFmpeg Docker build, the flat C API (`pup_*`), TS bindings, and synchronous Range/Blob readers |
 | [packages/pup-player](packages/pup-player) | The engine (workers, clock, A/V sync) and the Lit elements |
+| [packages/pup-player-bundle](packages/pup-player-bundle) | Standalone build of the elements (lit, workers and wasm included) for use from plain HTML |
 | [apps/demo](apps/demo) | Vite demo that plays fixtures, URLs or files side by side with a native `<video>` |
 | [e2e](e2e) | Playwright tests (Chromium and Firefox) |
 | [test-media](test-media) | `generate.sh` creates the 10 s test fixtures with the ffmpeg CLI |
@@ -51,7 +51,7 @@ main thread               demux worker (wasm st)        decode worker (wasm st|m
 
 ### WebAssembly build matrix
 
-`packages/pup-wasm/scripts/build.sh <set> <st|mt>` produces `dist/pup-core-<set>-<st|mt>.{mjs,wasm}`.
+`pnpm build:wasm` builds all four cores into `packages/pup-wasm/dist/pup-core-<set>-<st|mt>.{mjs,wasm}` with `docker buildx` (`packages/pup-wasm/Dockerfile`: pinned emsdk 6.0.11 and FFmpeg 7.1.2). Each core is two stages: `scripts/build-ffmpeg.sh` compiles FFmpeg (slow) and `scripts/link-core.sh` links the C wrapper (seconds), so changes to `src/c` reuse the cached FFmpeg builds. Both are build-time variants; the element picks one at runtime.
 
 - **Codec sets** are defined in `configs/*.json`:
   - `full` (default, about 8.5 MB of wasm, 3.4 MB gzipped): almost every container and codec that was ever widely used, all native LGPL FFmpeg code with zlib from Emscripten's port:
@@ -84,12 +84,12 @@ main thread               demux worker (wasm st)        decode worker (wasm st|m
 
 ## Development
 
-Prerequisites: Node 22 or later, pnpm 9, and the ffmpeg CLI (used only to generate fixtures).
+Prerequisites: Node 22 or later, pnpm 9, Docker with buildx, and the ffmpeg CLI (used only to generate fixtures).
 
 ```sh
 pnpm install
-pnpm --filter @pup/wasm setup        # installs a pinned emsdk (6.0.11) into packages/pup-wasm/third_party and downloads FFmpeg 7.1.2
-pnpm build:wasm                      # builds all four cells (full|lite × st|mt)
+pnpm build:wasm                      # Docker: builds all four cores (full|lite × st|mt) into packages/pup-wasm/dist
+pnpm build                           # compiles the three packages (lib/ and the standalone bundle)
 ./test-media/generate.sh             # creates the test fixtures
 ./test-media/generate-legacy.sh      # legacy/exotic fixtures (WMV, RealMedia, FLV1, DivX 3, DV, MXF, ...)
 pnpm dev                             # demo at http://localhost:5173
@@ -101,9 +101,21 @@ Tests:
 
 ```sh
 pnpm test                            # Vitest: wasm smoke tests in Node (every fixture, including all legacy ones) and player unit tests
-pnpm test:e2e                        # Playwright: Chromium + Firefox, starts the demo on :5199
+pnpm test:e2e                        # Playwright: Chromium + Firefox, starts the demo on :5199 and the bundle site on :5198
 ```
+
+## Releases
+
+`.github/workflows/build.yml` runs only when started by hand (Actions → build → Run workflow):
+
+- `run_tests` (checkbox) adds typecheck, unit and Chromium e2e tests.
+- Publishing happens only when a version is known: the `version` input, or a tag ref selected as the workflow's branch (`v1.2.3` publishes `1.2.3`). Then `@krab3000/pup-wasm`, `@krab3000/pup-player` and `@krab3000/pup-player-bundle` are published to GitHub Packages, and a GitHub Release is created with the package tarballs, the bundle as a zip, and the FFmpeg source.
+- Without a version, the packages are only built and attached to the run as artifacts.
+
+The wasm build uses a BuildKit layer cache in GHCR (`ghcr.io/krab3000/pup-video-player:buildcache`), so FFmpeg is recompiled only when the emsdk/FFmpeg versions, a codec config or the FFmpeg build script change.
+
+Installing the packages needs `@krab3000:registry=https://npm.pkg.github.com` in `.npmrc` and a token with `read:packages`.
 
 ## License
 
-The FFmpeg build is configured LGPL-only (no `--enable-gpl` and no GPL components). If you distribute the wasm binaries, you must meet the LGPL-2.1 obligations: provide the FFmpeg source and build scripts, both of which are in this repo.
+The FFmpeg build is configured LGPL-only (no `--enable-gpl` and no GPL components). If you distribute the wasm binaries, you must meet the LGPL-2.1 obligations: provide the FFmpeg source and the build scripts. The scripts are in this repo, and the exact FFmpeg source tarball is attached to every GitHub Release (`pnpm build:wasm:source` exports it locally). Every package ships the license text ([LICENSE](LICENSE)).

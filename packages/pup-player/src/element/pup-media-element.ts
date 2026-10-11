@@ -1,7 +1,7 @@
 // LitElement base implementing the HTMLMediaElement surface on top of
 // PupEngine. Subclasses render the video surface (or nothing, for audio).
 
-import type { CodecSet } from '@pup/wasm';
+import type { CodecSet } from '@krab3000/pup-wasm';
 import { LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 import {
@@ -16,12 +16,12 @@ import {
   NETWORK_NO_SOURCE,
   PupEngine,
   type EngineStats,
-} from '../engine/engine';
-import type { Source } from '../engine/protocol';
-import type { Renderer } from '../engine/renderer';
-import { canPlayType } from './can-play-type';
-import type { PupMediaError } from './media-error';
-import { PupTimeRanges } from './time-ranges';
+} from '../engine/engine.js';
+import type { Source } from '../engine/protocol.js';
+import type { Renderer } from '../engine/renderer.js';
+import { canPlayType } from './can-play-type.js';
+import type { PupMediaError } from './media-error.js';
+import { PupTimeRanges } from './time-ranges.js';
 
 /** Events the controls (and subclasses) re-render on. */
 export const MEDIA_EVENTS = [

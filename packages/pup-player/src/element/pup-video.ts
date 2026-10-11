@@ -1,8 +1,8 @@
 import { css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
-import { CanvasRenderer, type Renderer } from '../engine/renderer';
-import './pup-controls';
-import { PupMediaElement } from './pup-media-element';
+import { CanvasRenderer, type Renderer } from '../engine/renderer.js';
+import './pup-controls.js';
+import { PupMediaElement } from './pup-media-element.js';
 
 /**
  * <pup-video>: drop-in replacement for <video> backed by FFmpeg (wasm) and

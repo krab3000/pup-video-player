@@ -15,3 +15,7 @@ test-results
 playwright-report
 test-media/*.avi
 test-media/legacy/
+packages/*/lib
+packages/pup-wasm/release
+packages/*/LICENSE
+*.tgz

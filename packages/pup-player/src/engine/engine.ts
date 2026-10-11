@@ -2,10 +2,10 @@
 // audio worklet). It owns the HTMLMediaElement state machine and reports
 // changes as standard media event names through `emit`.
 
-import type { CodecSet } from '@pup/wasm';
-import { PupMediaError } from '../element/media-error';
-import { loadAudioSink } from './audio-sink';
-import { MediaClock } from './clock';
+import type { CodecSet } from '@krab3000/pup-wasm';
+import { PupMediaError } from '../element/media-error.js';
+import { loadAudioSink } from './audio-sink.js';
+import { MediaClock } from './clock.js';
 import {
   MediaErrorCode,
   type AudioMode,
@@ -17,8 +17,8 @@ import {
   type ToDecode,
   type ToDemux,
   type ToWorklet,
-} from './protocol';
-import type { Renderer } from './renderer';
+} from './protocol.js';
+import type { Renderer } from './renderer.js';
 
 export const HAVE_NOTHING = 0;
 export const HAVE_METADATA = 1;

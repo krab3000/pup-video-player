@@ -1,7 +1,7 @@
 // HTMLMediaElement.canPlayType for what the wasm build (plus WebCodecs) can
 // handle. Answers from the static codec-set configs, so no wasm is loaded.
 
-import { fullConfig, liteConfig, type CodecSet } from '@pup/wasm';
+import { fullConfig, liteConfig, type CodecSet } from '@krab3000/pup-wasm';
 
 const CONTAINERS: Record<string, string> = {
   'video/mp4': 'mov',

@@ -13,7 +13,7 @@ import {
   loadCore,
   type Core,
   type StreamInfo,
-} from '@pup/wasm';
+} from '@krab3000/pup-wasm';
 import {
   MediaErrorCode,
   type DecodeToDemux,
@@ -22,7 +22,7 @@ import {
   type MediaInfo,
   type Source,
   type ToDemux,
-} from './protocol';
+} from './protocol.js';
 
 const BLOCK_SIZE = 1 << 20;
 const BATCH_PACKETS = 48;

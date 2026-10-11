@@ -1,4 +1,4 @@
-import type { MediaErrorCode } from '../engine/protocol';
+import type { MediaErrorCode } from '../engine/protocol.js';
 
 /** Mirrors the HTMLMediaElement MediaError interface. */
 export class PupMediaError implements MediaError {

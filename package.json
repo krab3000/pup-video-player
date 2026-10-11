@@ -3,8 +3,9 @@
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "build:wasm": "pnpm --filter @pup/wasm build",
-    "build": "pnpm -r build",
+    "build:wasm": "pnpm --filter @krab3000/pup-wasm build:wasm",
+    "build:wasm:source": "pnpm --filter @krab3000/pup-wasm build:wasm:source",
+    "build": "pnpm -r --filter './packages/**' run build",
     "dev": "pnpm --filter demo dev",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",

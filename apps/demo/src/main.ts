@@ -1,5 +1,5 @@
-import '@pup/player';
-import type { PupVideoElement } from '@pup/player';
+import '@krab3000/pup-player';
+import type { PupVideoElement } from '@krab3000/pup-player';
 
 const FIXTURES = [
   'h264-aac.mp4',
